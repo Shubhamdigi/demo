@@ -1,33 +1,10 @@
-"use strict";
+const UserService = require("../services/userService");
+const { Jwt } = require("../apps/jwt");
 
-const Users = require("../models/index").Users;
-const Userservice = require("../services/userService");
-
-// const userManagementController = {
-//   async login(req, res) {
-//     const { email, password } = req.body;
-
-//     const response = await Userservice.login(email.toLowerCase(), password);
-
-//     switch (response) {
-//       case "success":
-//         return res
-//           .status(200)
-//           .send(`you have succesfully logged in with ${email}`);
-
-//       case "notFound":
-//         return res.status(401).send(`No user with this email found`);
-//       case "doesnt match":
-//         return res.status(401).send(`password doesn't matches our records`);
-//     }
-//   },
-// };
-
-exports.Login = async (req, res, next) => {
+exports.Login = async (req, res) => {
   var authHeader = req.headers.authorization;
   if (!authHeader) {
-    var err = new Error("You are not authorized.");
-    return unauthorizedResponse(req, res, err.message);
+    return res.status(401).send("You are not authorized.");
   }
 
   var auth = new Buffer(authHeader.split(" ")[1], "base64")
@@ -39,36 +16,45 @@ exports.Login = async (req, res, next) => {
   const user = await UserService.getUserByEmail(email.toLowerCase());
 
   if (!user) {
-    const err = new Error("No user with that email found.");
-    return unauthorizedResponse(req, res, err.message);
+    return res.status(401).send(`No user with this email found`);
   } else {
-    bcrypt.compare(password, user.password, async (error, isMatch) => {
-      if (error) {
-        const err = new Error("passwords do not match.");
-        return unauthorizedResponse(req, res, err.message);
-      } else if (isMatch) {
-        const loginToken = new Jwt().createToken(
-          { email: user.email, user_id: user.user_id },
-          { expiresIn: "24h" }
-        );
+    if (password == user.password) {
+      const loginToken = new Jwt().createToken(
+        { email: user.email, user_id: user.user_id },
+        { expiresIn: "24h" }
+      );
 
-        await user.update({ login_token: loginToken, loginAt: new Date() });
+      await user.update({ login_token: loginToken });
 
-        const message = {
-          email: user.email,
-          login_token: loginToken,
-          user_id: user.user_id,
-          user_name: user.name,
-          group_name: user.groups.group_name,
-        };
+      const message = {
+        email: user.email,
+        login_token: loginToken,
+        user_id: user.user_id,
+        user_name: user.name,
+        group_name: user.groups.group_name,
+      };
 
-        return okResponse(req, res, message);
-      } else {
-        const err = new Error("passwords do not match.");
-        return unauthorizedResponse(req, res, err.message);
-      }
-    });
+      return res.status(200).send(message);
+    } else {
+      return res.status(401).send(`password doesn't matches our records`);
+    }
   }
 };
 
-// module.exports = userManagementController;
+exports.getPlayers = async (req, res) => {
+  try {
+    const data = await UserService.getPlayers();
+    return res.send({ data });
+  } catch (e) {
+    console.log(e);
+  }
+};
+
+exports.getMaps = async (req, res) => {
+  try {
+    const map_data = await UserService.getMaps();
+    return res.send({ map_data });
+  } catch (e) {
+    console.log(e);
+  }
+};
